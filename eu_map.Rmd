@@ -1,0 +1,137 @@
+---
+title: "eu_map_history_script"
+author: "Rasmus Stengaard Hansen"
+date: "2025-02-28"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, echo=FALSE, message=FALSE}
+library(tidyverse)
+library(leaflet)
+library(htmlwidgets)
+library(ggplot2)
+library(shiny)
+library(sf)
+library(dplyr)
+library(purrr)
+#dir.create("data")
+
+```
+
+Loading and mutating data
+
+```{r}
+
+eu_data <- read.csv("data/eu_data.csv")
+
+eu_data <- eu_data %>%
+  mutate(
+    group = as.character(year),
+    ref_result_yes = as.numeric(ref_result_yes),
+    ref_result_no = as.numeric(ref_result_no),
+    yes_percentage = round(ref_result_yes / total_votes * 100, 2),
+    no_percentage = round(ref_result_no / total_votes * 100, 2)
+  )
+
+```
+
+Create function to print the plots
+
+```{r}
+
+
+create_referendum_plot <- function(country, result_yes_percentage, result_no_percentage) {
+  ref_results <- data.frame(
+   Option = factor(c("Yes", "No"), levels = c("Yes", "No")),
+   Percentage = c(result_yes_percentage, result_no_percentage)  
+  )
+
+plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = c("Yes" = "green", "No" = "red")) +
+    scale_y_continuous(breaks = seq(0, 100, 25), labels = scales::label_percent(scale = 1, accuracy = 1)) +
+    labs(title = paste("Referendum Results for", country),
+         x = "Option", y = "Percentage") +
+    theme_minimal(base_family = "sans") +
+    theme(axis.text.y = element_text(size = 10),
+          axis.text.x = element_text(size = 12),
+          legend.position = "none") +
+    geom_text(aes(label = paste0(round(Percentage, 1), "%")),
+              position = position_stack(vjust = 0.5),
+              size = 4, color = "black")
+
+ ggsave(paste0("www/", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png"), plot, 
+       width = 4, height = 3, dpi = 300, bg = "white")
+}
+
+```
+
+Call on 'create_referendum_plot' to print the plots for all countries with referendums
+
+```{r}
+
+eu_data %>%
+  filter(accession_type == "Referendum") %>%
+  distinct(country, .keep_all = TRUE) %>%
+  pmap(~ create_referendum_plot(..2, ..10, ..11))
+
+
+```
+
+Create leaflet and run as shinyApp
+
+```{r}
+
+ui <- fluidPage(
+  titlePanel("EU Accession Timeline"),
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons("year_choice", "Select Year:", 
+                   choices = sort(unique(eu_data$year)), 
+                   selected = min(eu_data$year))  # Default to earliest year
+    ),
+    mainPanel(
+      leafletOutput("eu_map", height = "600px")
+    )
+  )
+)
+
+# Define Server
+server <- function(input, output, session) {
+  
+  # Initialize the base map
+  output$eu_map <- renderLeaflet({
+    leaflet() %>%
+      addProviderTiles("Esri.WorldGrayCanvas") %>%
+      setView(lng = 14.146644, lat = 51.177614, zoom = 4)
+  })
+  
+  # Update map when a year is selected
+  observe({
+    filtered_data <- eu_data %>% filter(year <= input$year_choice)  # Accumulate years
+
+    leafletProxy("eu_map", data = filtered_data) %>%
+      clearMarkers() %>%  # Clear previous markers
+      addAwesomeMarkers(
+        ~lng, ~lat, 
+              popup = ~paste0(
+  "<b>", country, "</b><br>",
+  "Year: ", year, "<br>",
+  "Accession Type: ", accession_type, "<br>",
+  "<img src='", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png' width='200'>"
+),
+      group = ~as.character(year)  # Group markers by year
+    )
+}
+)
+}
+
+# Run the Shiny app inside RMarkdown
+shinyApp(ui, server)
+
+
+```
+
+
+
