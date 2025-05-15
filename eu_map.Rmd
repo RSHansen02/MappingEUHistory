@@ -43,26 +43,36 @@ Create function to print the plots
 
 create_referendum_plot <- function(country, result_yes_percentage, result_no_percentage) {
   ref_results <- data.frame(
-   Option = factor(c("Yes", "No"), levels = c("Yes", "No")),
-   Percentage = c(result_yes_percentage, result_no_percentage)  
+    Option = factor(c("Yes", "No"), levels = c("Yes", "No")),
+    Percentage = as.numeric(c(result_yes_percentage, result_no_percentage))
   )
+  
+ref_results$Label <- paste0(round(ref_results$Percentage, 1), "%")
 
 plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
     geom_bar(stat = "identity") +
     scale_fill_manual(values = c("Yes" = "green", "No" = "red")) +
-    scale_y_continuous(breaks = seq(0, 100, 25), labels = scales::label_percent(scale = 1, accuracy = 1)) +
-    labs(title = paste("Referendum Results for", country),
-         x = "Option", y = "Percentage") +
+    scale_y_continuous(
+      breaks = seq(0, 100, 25),
+      labels = scales::label_percent(scale = 1, accuracy = 1)
+    ) +
+    labs(
+      title = paste("Referendum Results for", country),
+      x = "Option", y = "Percentage"
+    ) +
     theme_minimal(base_family = "sans") +
-    theme(axis.text.y = element_text(size = 10),
-          axis.text.x = element_text(size = 12),
-          legend.position = "none") +
-    geom_text(aes(label = paste0(round(Percentage, 1), "%")),
-              position = position_stack(vjust = 0.5),
-              size = 4, color = "black")
-
- ggsave(paste0("www/", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png"), plot, 
-       width = 4, height = 3, dpi = 300, bg = "white")
+    theme(
+      axis.text.y = element_text(size = 10),
+      axis.text.x = element_text(size = 12),
+      legend.position = "none"
+    ) +
+    geom_text(aes(label = Label), position = position_stack(vjust = 0.5), size = 4, color = "black")
+  
+  ggsave(
+    paste0("www/", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png"),
+    plot,
+    width = 4, height = 3, dpi = 300, bg = "white"
+  )
 }
 
 ```
