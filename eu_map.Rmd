@@ -16,7 +16,8 @@ library(sf)
 library(dplyr)
 library(purrr)
 #dir.create("data")
-
+#dir.create("geo_data")
+#dir.create("graphics")
 ```
 
 Loading and mutating data
@@ -117,22 +118,26 @@ server <- function(input, output, session) {
       setView(lng = 14.146644, lat = 51.177614, zoom = 4)
   })
   
-  # Update map when a year is selected
-  observe({
+observe({
     filtered_data <- eu_data %>% filter(year <= input$year_choice)  # Accumulate years
 
     leafletProxy("eu_map", data = filtered_data) %>%
       clearMarkers() %>%  # Clear previous markers
       addAwesomeMarkers(
         ~lng, ~lat, 
-              popup = ~paste0(
-  "<b>", country, "</b><br>",
-  "Year: ", year, "<br>",
-  "Accession Type: ", accession_type, "<br>",
-  "<img src='", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png' width='200'>"
-),
-      group = ~as.character(year)  # Group markers by year
-    )
+        popup = ~paste0(
+          "<b>", country, "</b><br>",
+          "Year: ", year, "<br>",
+          "Accession Type: ", accession_type, "<br>",
+          ifelse(
+            accession_type %in% c("Referendum", "Referendum (advisory)"),
+            paste0(
+              "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
+              gsub("[^A-Za-z0-9]", "_", tolower(country)),"_referendum.png' width='200'>"
+            ), ""
+          )
+        )
+      )
 }
 )
 }
