@@ -41,10 +41,10 @@ Create function to print the plots
 ```{r}
 
 
-create_referendum_plot <- function(country, result_yes_percentage, result_no_percentage) {
+create_referendum_plot <- function(country, yes_percentage, no_percentage) {
   ref_results <- data.frame(
     Option = factor(c("Yes", "No"), levels = c("Yes", "No")),
-    Percentage = as.numeric(c(result_yes_percentage, result_no_percentage))
+    Percentage = as.numeric(c(yes_percentage, no_percentage))
   )
   
 ref_results$Label <- paste0(round(ref_results$Percentage, 1), "%")
@@ -69,7 +69,7 @@ plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
     geom_text(aes(label = Label), position = position_stack(vjust = 0.5), size = 4, color = "black")
   
   ggsave(
-    paste0("www/", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png"),
+    paste0("graphics/", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png"),
     plot,
     width = 4, height = 3, dpi = 300, bg = "white"
   )
@@ -84,7 +84,7 @@ Call on 'create_referendum_plot' to print the plots for all countries with refer
 eu_data %>%
   filter(accession_type == "Referendum") %>%
   distinct(country, .keep_all = TRUE) %>%
-  pmap(~ create_referendum_plot(..2, ..10, ..11))
+  pmap(~ create_referendum_plot(..2, ..11, ..12))
 
 
 ```
