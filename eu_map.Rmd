@@ -90,6 +90,31 @@ eu_data %>%
 
 ```
 
+
+
+```{r}
+
+iso3_codes <- unique(eu_data$country_iso)
+
+read_country_polygon <- function(iso3) {
+  url <- paste0(
+    "https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/geo_data/gadm41_",
+    iso3, "_0.geojson"
+  )
+  tryCatch({
+    sf_obj <- st_read(url, quiet = TRUE)
+    sf_obj$country_iso <- iso3
+    sf_obj
+  }, error = function(e) NULL)
+}
+
+all_polygons <- map_dfr(iso3_codes, read_country_polygon)
+
+# Merge GeoJSON polygons with EU accession data
+eu_polygons <- left_join(all_polygons, eu_data, by = "country_iso")
+
+```
+
 Create leaflet and run as shinyApp
 
 ```{r}
