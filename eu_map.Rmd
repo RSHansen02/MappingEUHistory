@@ -24,7 +24,7 @@ Loading and mutating data
 
 ```{r}
 
-eu_data <- read.csv("data/eu_data.csv")
+eu_data <- read.csv("https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/refs/heads/main/data/eu_data.csv")
 
 eu_data <- eu_data %>%
   mutate(
@@ -99,18 +99,24 @@ iso3_codes <- unique(eu_data$country_iso)
 read_country_polygon <- function(iso3) {
   url <- paste0(
     "https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/geo_data/gadm41_",
-    iso3, "_0.geojson"
+    iso3, "_0.json"
   )
+  message("Trying ", iso3, ": ", url)
+  
   tryCatch({
-    sf_obj <- st_read(url, quiet = TRUE)
-    sf_obj$country_iso <- iso3
-    sf_obj
-  }, error = function(e) NULL)
+    poly <- st_read(url, quiet = TRUE)
+    poly$country_iso <- iso3
+    poly
+  }, error = function(e) {
+    message("❌ Failed: ", iso3)
+    NULL
+  })
 }
 
-all_polygons <- map_dfr(iso3_codes, read_country_polygon)
+polygon_list <- map(iso3_codes, read_country_polygon) |> compact()
 
-# Merge GeoJSON polygons with EU accession data
+all_polygons <- bind_rows(polygon_list)
+
 eu_polygons <- left_join(all_polygons, eu_data, by = "country_iso")
 
 ```
@@ -158,7 +164,7 @@ observe({
             accession_type %in% c("Referendum", "Referendum (advisory)"),
             paste0(
               "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
-              gsub("[^A-Za-z0-9]", "_", tolower(country)),"_referendum.png' width='200'>"
+              gsub("[^A-Za-z0-9]", "_", tolower(country)),"_referendum.png' width='300'>"
             ), ""
           )
         )
