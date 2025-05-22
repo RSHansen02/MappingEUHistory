@@ -119,6 +119,8 @@ all_polygons <- bind_rows(polygon_list)
 
 eu_polygons <- left_join(all_polygons, eu_data, by = "country_iso")
 
+eu_polygons
+
 ```
 
 Create leaflet and run as shinyApp
@@ -180,4 +182,68 @@ shinyApp(ui, server)
 ```
 
 
+
+
+```{r}
+
+ui <- fluidPage(
+  titlePanel("EU Accession Timeline"),
+  sidebarLayout(
+    sidebarPanel(
+      radioButtons("year_choice", "Select Year:", 
+                   choices = sort(unique(eu_data$year)), 
+                   selected = min(eu_data$year))  # Default to earliest year
+    ),
+    mainPanel(
+      leafletOutput("eu_map", height = "600px")
+    )
+  )
+)
+
+# Define Server
+server <- function(input, output, session) {
+  
+  # Initialize the base map
+  output$eu_map <- renderLeaflet({
+    leaflet() %>%
+      addProviderTiles("Esri.WorldGrayCanvas") %>%
+      setView(lng = 14.146644, lat = 51.177614, zoom = 4)
+  })
+  
+observe({
+  filtered_polygons <- eu_polygons %>% filter(year <= input$year_choice)
+
+  leafletProxy("eu_map", data = filtered_polygons) %>%
+    clearShapes() %>%  
+    addPolygons(
+      fillColor = "blue3",
+      weight = 1,
+      color = "white",
+      fillOpacity = 0.7,
+      popup = ~paste0(
+        "<b>", country, "</b><br>",
+        "Year: ", year, "<br>",
+        "Accession Type: ", accession_type, "<br>",
+        ifelse(
+          accession_type %in% c("Referendum", "Referendum (advisory)"),
+          paste0(
+            "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
+            gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png' width='200'>"
+          ),""
+        )
+      ),
+         highlightOptions = highlightOptions(
+          weight = 3,         
+          color = "blue4",    
+          fillOpacity = 0.9,  
+          bringToFront = TRUE  
+         )
+    )
+})
+}
+
+# Run the Shiny app inside RMarkdown
+shinyApp(ui, server)
+
+```
 
