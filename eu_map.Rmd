@@ -15,6 +15,7 @@ library(shiny)
 library(sf)
 library(dplyr)
 library(purrr)
+library(rmapshaper)
 #dir.create("data")
 #dir.create("geo_data")
 #dir.create("graphics")
@@ -117,72 +118,15 @@ polygon_list <- map(iso3_codes, read_country_polygon) |> compact()
 
 all_polygons <- bind_rows(polygon_list)
 
-eu_polygons <- left_join(all_polygons, eu_data, by = "country_iso")
+all_polygons_simplified <- ms_simplify(all_polygons, keep = 0.05, keep_shapes = TRUE)
+
+eu_polygons <- left_join(all_polygons_simplified, eu_data, by = "country_iso")
 
 eu_polygons
 
 ```
 
 Create leaflet and run as shinyApp
-
-```{r}
-
-ui <- fluidPage(
-  titlePanel("EU Accession Timeline"),
-  sidebarLayout(
-    sidebarPanel(
-      radioButtons("year_choice", "Select Year:", 
-                   choices = sort(unique(eu_data$year)), 
-                   selected = min(eu_data$year))  # Default to earliest year
-    ),
-    mainPanel(
-      leafletOutput("eu_map", height = "600px")
-    )
-  )
-)
-
-# Define Server
-server <- function(input, output, session) {
-  
-  # Initialize the base map
-  output$eu_map <- renderLeaflet({
-    leaflet() %>%
-      addProviderTiles("Esri.WorldGrayCanvas") %>%
-      setView(lng = 14.146644, lat = 51.177614, zoom = 4)
-  })
-  
-observe({
-    filtered_data <- eu_data %>% filter(year <= input$year_choice)  # Accumulate years
-
-    leafletProxy("eu_map", data = filtered_data) %>%
-      clearMarkers() %>%  # Clear previous markers
-      addAwesomeMarkers(
-        ~lng, ~lat, 
-        popup = ~paste0(
-          "<b>", country, "</b><br>",
-          "Year: ", year, "<br>",
-          "Accession Type: ", accession_type, "<br>",
-          ifelse(
-            accession_type %in% c("Referendum", "Referendum (advisory)"),
-            paste0(
-              "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
-              gsub("[^A-Za-z0-9]", "_", tolower(country)),"_referendum.png' width='300'>"
-            ), ""
-          )
-        )
-      )
-}
-)
-}
-
-# Run the Shiny app inside RMarkdown
-shinyApp(ui, server)
-
-
-```
-
-
-
 
 ```{r}
 
