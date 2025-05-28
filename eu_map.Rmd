@@ -16,6 +16,7 @@ library(sf)
 library(dplyr)
 library(purrr)
 library(rmapshaper)
+library(shinyWidgets)
 ```
 
 Loading and mutating data
@@ -109,6 +110,52 @@ read_country_polygon <- function(iso3) {
     NULL
   })
 }
+```
+
+
+```{r}
+
+all_polygons <- iso3_codes %>%
+  map(read_country_polygon) %>%
+  compact() %>%   # remove NULLs from failed reads
+  bind_rows()
+
+# Simplify polygons for better performance (optional)
+eu_polygons_simple <- ms_simplify(all_polygons, keep = 0.05, keep_shapes = TRUE)
+
+# Join with eu_data to get accession year and info for each country polygon
+# This assumes eu_data has 'country_iso', 'year', 'accession_type', 'country' columns
+eu_polygons <- eu_polygons_simple %>%
+  left_join(
+    eu_data %>% 
+      distinct(country_iso, country, year, accession_type), 
+    by = "country_iso"
+  )
+
+```
+
+
+
+```{r}
+
+ui <- fluidPage(
+  titlePanel("EU Accession History"),
+  sidebarLayout(
+    sidebarPanel(
+      sliderTextInput(
+  inputId = "year_choice",
+  label = "Select year:",
+  choices = sort(unique(eu_data$year)),
+  selected = min(eu_data$year),
+  grid = TRUE,
+  animate = animationOptions(interval = 1000, loop = FALSE)
+)
+),
+    mainPanel(
+      leafletOutput("eu_map", height = "800px")  # taller map
+    )
+  )
+)
 
 ```
 
@@ -125,10 +172,6 @@ server <- function(input, output, session) {
   # Initialize the base map
   output$eu_map <- renderLeaflet({
   leaflet(options = leafletOptions(
-     maxBounds = list(
-      list(lat = 34.5, lng = -25),  # Southwest corner (lat, lng)
-      list(lat = 72, lng = 45)      # Northeast corner (lat, lng)
-    ),
     dragging = FALSE,         # Disable panning
     zoomControl = FALSE,      # Hide zoom buttons
     scrollWheelZoom = FALSE,  # Disable scroll zoom
@@ -136,7 +179,7 @@ server <- function(input, output, session) {
     touchZoom = FALSE         # Disable touch gestures (mobile)
   )) %>%
     addProviderTiles("Esri.WorldGrayCanvas") %>%
-    setView(lng = 14.146644, lat = 51.177614, zoom = 4)
+    setView(lng = 14.146644, lat = 55.177614, zoom = 4.4)
 })
   
   # Add all year layers once (on first load only)
@@ -172,6 +215,7 @@ observe({
                 ),""
             )
           ),
+          options = popupOptions(autoPan = FALSE),
           highlightOptions = highlightOptions(
           weight = 3,
           color = "yellow",
