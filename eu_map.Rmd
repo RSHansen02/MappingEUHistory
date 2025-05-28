@@ -16,9 +16,6 @@ library(sf)
 library(dplyr)
 library(purrr)
 library(rmapshaper)
-#dir.create("data")
-#dir.create("geo_data")
-#dir.create("graphics")
 ```
 
 Loading and mutating data
@@ -127,10 +124,20 @@ server <- function(input, output, session) {
   
   # Initialize the base map
   output$eu_map <- renderLeaflet({
-    leaflet() %>%
-      addProviderTiles("Esri.WorldGrayCanvas") %>%
-      setView(lng = 14.146644, lat = 51.177614, zoom = 4)
-  })
+  leaflet(options = leafletOptions(
+     maxBounds = list(
+      list(lat = 34.5, lng = -25),  # Southwest corner (lat, lng)
+      list(lat = 72, lng = 45)      # Northeast corner (lat, lng)
+    ),
+    dragging = FALSE,         # Disable panning
+    zoomControl = FALSE,      # Hide zoom buttons
+    scrollWheelZoom = FALSE,  # Disable scroll zoom
+    doubleClickZoom = FALSE,  # Disable double-click zoom
+    touchZoom = FALSE         # Disable touch gestures (mobile)
+  )) %>%
+    addProviderTiles("Esri.WorldGrayCanvas") %>%
+    setView(lng = 14.146644, lat = 51.177614, zoom = 4)
+})
   
   # Add all year layers once (on first load only)
 observe({
@@ -149,25 +156,30 @@ observe({
           data = layer_sf,
           group = as.character(yr),
           stroke = TRUE,
-          fillColor = "blue3",
+          color = "white",     # Border color
           weight = 1,
-          color = "white",
-          fillOpacity = 0.5,
+          fillColor = "darkblue",  # Try basic "blue" to eliminate potential naming issues
+          fillOpacity = 0.8,
           popup = ~paste0(
             "<b>", country, "</b><br>",
             "Year: ", year, "<br>",
             "Accession Type: ", accession_type, "<br>",
             ifelse(
               accession_type == "Referendum",
-              paste0(
-                "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
-                gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png' width='200'>"
-              ),
-              ""
+                paste0(
+                  "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
+                  gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png' width='200'>"
+                ),""
             )
+          ),
+          highlightOptions = highlightOptions(
+          weight = 3,
+          color = "yellow",
+          fillOpacity = 1,
+          bringToFront = TRUE
           )
         ) 
-    }
+      }
 
     polygons_initialized(TRUE)
   }
@@ -190,83 +202,6 @@ observe({
 }
 
 shinyApp(ui, server)
-
-
-```
-
-
-
-```{r}
-
-# Define Server
-server <- function(input, output, session) {
-  output$eu_map <- renderLeaflet({
-    # Filter a single year for testing
-    layer_sf <- eu_polygons %>%
-      dplyr::filter(year == 1995) %>%
-      sf::st_make_valid() %>%
-      sf::st_transform(4326)
-    
-    leaflet(layer_sf) %>%
-      addProviderTiles("Esri.WorldGrayCanvas") %>%
-      addPolygons(
-        fillColor = "blue3",  # Hardcoded fill color
-        color = "white",      # Border color
-        weight = 1,
-        stroke = TRUE,
-        fillOpacity = 0.7,
-        popup = ~paste0(
-          "<b>", country, "</b><br>",
-          "Year: ", year, "<br>",
-          "Accession Type: ", accession_type, "<br>",
-          ifelse(
-            accession_type %in% c("Referendum", "Referendum (advisory)"),
-            paste0(
-              "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
-              gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png' width='200'>"
-            ),
-            ""
-          )
-        ),
-        highlightOptions = highlightOptions(
-          weight = 3,
-          color = "blue4",
-          fillOpacity = 0.9,
-          bringToFront = TRUE
-        )
-      )
-  })
-}
-
-shinyApp(ui, server)
-
-
-```
-
-
-
-```{r}
-
-square <- st_polygon(list(rbind(
-  c(10, 50),
-  c(15, 50),
-  c(15, 55),
-  c(10, 55),
-  c(10, 50)
-))) %>%
-  st_sfc(crs = 4326) %>%
-  st_sf(id = 1, geometry = .)
-
-leaflet(square) %>%
-  addTiles() %>%
-  addPolygons(
-    fillColor = "blue3",
-    color = "white",
-    weight = 1,
-    fillOpacity = 0.7,
-    stroke = TRUE,
-    popup = "Test Polygon"
-  )
 
 
 ```
