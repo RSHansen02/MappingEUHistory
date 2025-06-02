@@ -22,6 +22,7 @@ library(purrr)
 library(rmapshaper)
 library(shinyWidgets)
 library(flexdashboard)
+library(rsconnect)
 
 ```
 
@@ -349,4 +350,5 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 
 ```
+
 
