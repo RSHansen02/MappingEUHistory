@@ -1,9 +1,13 @@
 ---
-title: "eu_map_history_script"
+title: "History of EU Enlargement"
 author: "Rasmus Stengaard Hansen"
 date: "2025-02-28"
-output: html_document
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
 runtime: shiny
+self_contained: true
 ---
 
 ```{r setup, echo=FALSE, message=FALSE}
@@ -17,11 +21,15 @@ library(dplyr)
 library(purrr)
 library(rmapshaper)
 library(shinyWidgets)
+library(flexdashboard)
+
 ```
 
-Loading and mutating data
 
-```{r}
+
+```{r include = FALSE}
+
+#Loading and mutating data
 
 eu_data <- read.csv("https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/refs/heads/main/data/eu_data.csv")
 
@@ -38,10 +46,11 @@ year_info <- read.csv("https://raw.githubusercontent.com/RSHansen02/MappingEUHis
 
 ```
 
-Create function to print the plots
 
-```{r}
 
+```{r include = FALSE}
+
+#Create function to print the plots
 
 create_referendum_plot <- function(country, yes_percentage, no_percentage) {
   ref_results <- data.frame(
@@ -79,9 +88,11 @@ plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
 
 ```
 
-Call on 'create_referendum_plot' to print the plots for all countries with referendums
 
-```{r}
+
+```{r include = FALSE}
+
+#Call on 'create_referendum_plot' to print the plots for all countries with referendums
 
 eu_data %>%
   filter(accession_type == "Referendum") %>%
@@ -93,7 +104,10 @@ eu_data %>%
 
 
 
-```{r}
+```{r include = FALSE}
+
+#Load ISO3 codes and setup function to read geo data
+
 iso3_codes <- unique(eu_data$country_iso)
 
 read_country_polygon <- function(iso3) {
@@ -115,7 +129,10 @@ read_country_polygon <- function(iso3) {
 ```
 
 
-```{r}
+
+```{r include = FALSE}
+
+#Read geo data and leftjoin to dataset, create new df "eu_polygons"
 
 all_polygons <- iso3_codes %>%
   map(read_country_polygon) %>%
@@ -138,52 +155,126 @@ eu_polygons <- eu_polygons_simple %>%
 
 
 
-```{r}
+```{r include = FALSE}
+
+#Dictate ui specifications
 
 ui <- fluidPage(
-  titlePanel("History of EU Enlargement"),
-  
-  sidebarLayout(
-    sidebarPanel(
+  tags$head(
+    tags$style(HTML("
+      html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#app-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Entire viewport height */
+}
+
+.intro-text {
+  max-width: 1200px;
+  margin: 20px auto 0 auto;
+  padding: 0 20px;
+  font-size: 1.7rem;
+  line-height: 1.5;
+}
+
+.app-container {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  max-width: 960px;
+  margin: auto;
+  width: 100%;
+}
+
+.sidebar {
+  width: 300px;
+  padding: 10px;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+}
+
+.main {
+  width: 580px;
+  height: 800px;
+  padding: 10px;
+  position: relative;
+}
+
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+    "))
+  ),
+
+ div(id = "app-wrapper",
+
+  # Intro text that scrolls away as you scroll
+  div(class = "intro-text",
+      h2("History of EU Enlargement"),
+      p("When the Nazi Germany agreed to unconditional surrender on 8th May 1945, the European continent found itself torn apart by war. Six years of armed conflict had put strain on both the people of Europe and their governments, both politically and economically. Peacetime became characterized by distrust"),
+      p("The emerging Cold War however shifted tensions. Needs for industrial collaboration in western Europe resulted in the creation of the European Coal and Steel Community in 1952. This industrial cooperative would allow its 6 founding members to create the earliest form of the European Union: The European Economic Community, born in 1958 by the Treaty of Rome. This organization had a scope similar to the EU we know today, with a parliament, a council, a commission, a court of justice and a common market zone. But its’ expansion was not a planned process."),
+      p("So how did we get from 6 founding members of the EEC to the 28 members of the EU? Despite not being a planned process, the expansion of the EU was no accident either. The changing circumstances of history between the 1950’s and today have enabled the expansion of the European Union to gradually make its way across all corners of Europe.  With the map below, you will be able to follow this expansion, from 1952 all the way to its widest extent in 2013. Use the slider and discover decades of development dynamically unfold before you. Click individual member states to learn the details of their accession to the Union.")
+  ),
+
+  # App section: sticks to bottom full viewport height
+  div(
+    class = "app-container",
+    div(
+      class = "sidebar",
       sliderTextInput(
         inputId = "year_choice",
         label = "Select year:",
         choices = sort(unique(eu_data$year)),
         selected = min(eu_data$year),
-        grid = TRUE,
-        animate = animationOptions(interval = 1000, loop = FALSE)
+        grid = TRUE
       ),
-      br(),
-      uiOutput("year_info")
+      uiOutput("year_info_box")
     ),
-    
-    mainPanel(
-      leafletOutput("eu_map", height = "800px")
+    div(
+      class = "main",
+      leafletOutput("eu_map", height = "100%")
     )
   )
+)
 )
 
 ```
 
 
 
-```{r}
+```{r echo = FALSE}
 
-# Define Server
+# Define and run server
+
 server <- function(input, output, session) {
   
   polygons_initialized <- reactiveVal(FALSE)
   
   output$eu_map <- renderLeaflet({
     leaflet(options = leafletOptions(
-      dragging = FALSE,
+      dragging = TRUE,
       zoomControl = FALSE,
       scrollWheelZoom = FALSE,
       doubleClickZoom = FALSE,
-      touchZoom = FALSE
+      preferCanvas = TRUE,
+      touchZoom = FALSE,
+      maxBounds = list(
+      list(lat = 25, lng = -25),  
+      list(lat = 80, lng = 45)    
+    )
     )) %>%
       addProviderTiles("Esri.WorldGrayCanvas") %>%
-      setView(lng = 14.146644, lat = 55.177614, zoom = 4.4)
+      fitBounds(
+      lng1 = -10.5, lat1 = 33,   # SW corner (lng, lat)
+      lng2 = 33.5, lat2 = 71     # NE corner (lng, lat)
+    )
   })
   
   observe({
@@ -213,7 +304,8 @@ server <- function(input, output, session) {
                 ), ""
               )
             ),
-            options = popupOptions(autoPan = FALSE),
+            options = popupOptions(
+              autoPan = FALSE),
             highlightOptions = highlightOptions(
               weight = 3,
               color = "yellow",
@@ -239,7 +331,7 @@ server <- function(input, output, session) {
     }
   })
   
-  output$year_info <- renderUI({
+  output$year_info_box <- renderUI({
     selected_year <- as.numeric(input$year_choice)
     info_row <- year_info %>% filter(year == selected_year)
     
@@ -257,3 +349,4 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 
 ```
+
