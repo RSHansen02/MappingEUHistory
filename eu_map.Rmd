@@ -54,14 +54,18 @@ year_info <- read.csv("https://raw.githubusercontent.com/RSHansen02/MappingEUHis
 #Create function to print the plots
 
 create_referendum_plot <- function(country, yes_percentage, no_percentage) {
+  if (!dir.exists("graphics")) {
+    dir.create("graphics")
+  }
+
   ref_results <- data.frame(
     Option = factor(c("Yes", "No"), levels = c("Yes", "No")),
     Percentage = as.numeric(c(yes_percentage, no_percentage))
   )
   
-ref_results$Label <- paste0(round(ref_results$Percentage, 1), "%")
+  ref_results$Label <- paste0(round(ref_results$Percentage, 1), "%")
 
-plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
+  plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
     geom_bar(stat = "identity") +
     scale_fill_manual(values = c("Yes" = "green", "No" = "red")) +
     scale_y_continuous(
@@ -79,7 +83,7 @@ plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
       legend.position = "none"
     ) +
     geom_text(aes(label = Label), position = position_stack(vjust = 0.5), size = 4, color = "black")
-  
+
   ggsave(
     paste0("graphics/", gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png"),
     plot,
@@ -95,11 +99,12 @@ plot <- ggplot(ref_results, aes(x = Option, y = Percentage, fill = Option)) +
 
 #Call on 'create_referendum_plot' to print the plots for all countries with referendums
 
-eu_data %>%
-  filter(accession_type == "Referendum") %>%
-  distinct(country, .keep_all = TRUE) %>%
-  pmap(~ create_referendum_plot(..2, ..11, ..12))
+#eu_data %>%
+  #filter(accession_type == "Referendum") %>%
+  #distinct(country, .keep_all = TRUE) %>%
+  #pmap(~ create_referendum_plot(..2, ..11, ..12))
 
+#NOTE commented out for stable deployment to shinyapps
 
 ```
 
