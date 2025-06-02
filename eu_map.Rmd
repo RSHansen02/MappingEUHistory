@@ -34,6 +34,8 @@ eu_data <- eu_data %>%
     no_percentage = round(ref_result_no / total_votes * 100, 2)
   )
 
+year_info <- read.csv("https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/refs/heads/main/data/aarstal_beskrivelser.csv")
+
 ```
 
 Create function to print the plots
@@ -139,20 +141,24 @@ eu_polygons <- eu_polygons_simple %>%
 ```{r}
 
 ui <- fluidPage(
-  titlePanel("EU Accession History"),
+  titlePanel("History of EU Enlargement"),
+  
   sidebarLayout(
     sidebarPanel(
       sliderTextInput(
-  inputId = "year_choice",
-  label = "Select year:",
-  choices = sort(unique(eu_data$year)),
-  selected = min(eu_data$year),
-  grid = TRUE,
-  animate = animationOptions(interval = 1000, loop = FALSE)
-)
-),
+        inputId = "year_choice",
+        label = "Select year:",
+        choices = sort(unique(eu_data$year)),
+        selected = min(eu_data$year),
+        grid = TRUE,
+        animate = animationOptions(interval = 1000, loop = FALSE)
+      ),
+      br(),
+      uiOutput("year_info")
+    ),
+    
     mainPanel(
-      leafletOutput("eu_map", height = "800px")  # taller map
+      leafletOutput("eu_map", height = "800px")
     )
   )
 )
@@ -166,86 +172,88 @@ ui <- fluidPage(
 # Define Server
 server <- function(input, output, session) {
   
-  # Track whether polygons were initialized
   polygons_initialized <- reactiveVal(FALSE)
   
-  # Initialize the base map
   output$eu_map <- renderLeaflet({
-  leaflet(options = leafletOptions(
-    dragging = FALSE,         # Disable panning
-    zoomControl = FALSE,      # Hide zoom buttons
-    scrollWheelZoom = FALSE,  # Disable scroll zoom
-    doubleClickZoom = FALSE,  # Disable double-click zoom
-    touchZoom = FALSE         # Disable touch gestures (mobile)
-  )) %>%
-    addProviderTiles("Esri.WorldGrayCanvas") %>%
-    setView(lng = 14.146644, lat = 55.177614, zoom = 4.4)
-})
+    leaflet(options = leafletOptions(
+      dragging = FALSE,
+      zoomControl = FALSE,
+      scrollWheelZoom = FALSE,
+      doubleClickZoom = FALSE,
+      touchZoom = FALSE
+    )) %>%
+      addProviderTiles("Esri.WorldGrayCanvas") %>%
+      setView(lng = 14.146644, lat = 55.177614, zoom = 4.4)
+  })
   
-  # Add all year layers once (on first load only)
-observe({
-  if (!polygons_initialized()) {
-    
-    for (yr in sort(unique(eu_data$year))) {
-      layer_sf <- eu_polygons %>% filter(year == yr)
-      
-      # Skip empty layers
-      if (nrow(layer_sf) == 0) next
-    
-      
-      # Add layer directly using leafletProxy inside the loop
-      leafletProxy("eu_map") %>%
-        addPolygons(
-          data = layer_sf,
-          group = as.character(yr),
-          stroke = TRUE,
-          color = "white",     # Border color
-          weight = 1,
-          fillColor = "darkblue",  # Try basic "blue" to eliminate potential naming issues
-          fillOpacity = 0.8,
-          popup = ~paste0(
-            "<b>", country, "</b><br>",
-            "Year: ", year, "<br>",
-            "Accession Type: ", accession_type, "<br>",
-            ifelse(
-              accession_type == "Referendum",
+  observe({
+    if (!polygons_initialized()) {
+      for (yr in sort(unique(eu_data$year))) {
+        layer_sf <- eu_polygons %>% filter(year == yr)
+        if (nrow(layer_sf) == 0) next
+        
+        leafletProxy("eu_map") %>%
+          addPolygons(
+            data = layer_sf,
+            group = as.character(yr),
+            stroke = TRUE,
+            color = "white",
+            weight = 1,
+            fillColor = "darkblue",
+            fillOpacity = 0.8,
+            popup = ~paste0(
+              "<b>", country, "</b><br>",
+              "Year: ", year, "<br>",
+              "Accession Type: ", accession_type, "<br>",
+              ifelse(
+                accession_type == "Referendum",
                 paste0(
                   "<img src='https://raw.githubusercontent.com/RSHansen02/MappingEUHistory/main/graphics/",
                   gsub("[^A-Za-z0-9]", "_", tolower(country)), "_referendum.png' width='200'>"
-                ),""
+                ), ""
+              )
+            ),
+            options = popupOptions(autoPan = FALSE),
+            highlightOptions = highlightOptions(
+              weight = 3,
+              color = "yellow",
+              fillOpacity = 1,
+              bringToFront = TRUE
             )
-          ),
-          options = popupOptions(autoPan = FALSE),
-          highlightOptions = highlightOptions(
-          weight = 3,
-          color = "yellow",
-          fillOpacity = 1,
-          bringToFront = TRUE
           )
-        ) 
       }
-
-    polygons_initialized(TRUE)
-  }
-})
+      polygons_initialized(TRUE)
+    }
+  })
   
-  # Dynamically control which groups are visible
   observe({
-  selected_year <- as.numeric(input$year_choice)
-  all_years <- sort(unique(eu_data$year))
+    selected_year <- as.numeric(input$year_choice)
+    all_years <- sort(unique(eu_data$year))
+    
+    proxy <- leafletProxy("eu_map")
+    for (yr in all_years) {
+      proxy <- hideGroup(proxy, group = as.character(yr))
+    }
+    for (yr in all_years[all_years <= selected_year]) {
+      proxy <- showGroup(proxy, group = as.character(yr))
+    }
+  })
   
-  proxy <- leafletProxy("eu_map")
-  
-  for (yr in all_years) {
-    proxy <- hideGroup(proxy, group = as.character(yr))
-  }
-  for (yr in all_years[all_years <= selected_year]) {
-    proxy <- showGroup(proxy, group = as.character(yr))
-  }
-})
+  output$year_info <- renderUI({
+    selected_year <- as.numeric(input$year_choice)
+    info_row <- year_info %>% filter(year == selected_year)
+    
+    if (nrow(info_row) == 1) {
+      div(
+        style = "border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; border-radius: 6px;",
+        HTML(paste0("<b>", selected_year, " Expansion:</b><br>", info_row$description))
+      )
+    } else {
+      NULL
+    }
+  })
 }
 
 shinyApp(ui, server)
-
 
 ```
